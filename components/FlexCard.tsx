@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 type FlexCardProps = {
   imageUrl: string;
   username: string;
@@ -5,7 +7,7 @@ type FlexCardProps = {
   soins: number;
   createdAt: string;
   status?: "pending" | "approved" | "rejected";
-  actions?: React.ReactNode;
+  actions?: ReactNode;
 };
 
 export default function FlexCard({
