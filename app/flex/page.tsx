@@ -2,13 +2,12 @@ import AppShell from "@/components/AppShell";
 import FlexCard from "@/components/FlexCard";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getSessionProfile } from "@/lib/session";
 
 export default async function FlexPage() {
+  const { userId } = await getSessionProfile();
+  if (!userId) redirect("/login");
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   const { data: posts } = await supabase
     .from("flex_posts")

@@ -21,7 +21,7 @@ export default function FlexCard({
 }: FlexCardProps) {
   return (
     <div className="card">
-      <img src={imageUrl} alt="Screen Flex" className="flex-img" />
+      <img src={imageUrl} alt="Screen Flex" className="flex-img" loading="lazy" decoding="async" />
       <div style={{ marginTop: 10 }}>
         <strong>{username}</strong>
         {status && status !== "approved" && (

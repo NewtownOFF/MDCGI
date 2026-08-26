@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   createAnnouncement,
   toggleAnnouncementPin,
@@ -8,6 +8,7 @@ import {
   markAnnouncementRead,
   markAllAnnouncementsRead,
 } from "@/lib/actions";
+import { renderAnnouncementBody } from "@/lib/markdown";
 
 type Announcement = {
   id: string;
@@ -29,6 +30,112 @@ function timeAgo(iso: string) {
   return `Il y a ${days}j`;
 }
 
+const TOOLBAR_ACTIONS = [
+  { label: "Gras", mark: "**", icon: "B", style: { fontWeight: 800 } },
+  { label: "Italique", mark: "*", icon: "I", style: { fontStyle: "italic" } },
+  { label: "Souligné", mark: "__", icon: "U", style: { textDecoration: "underline" } },
+  { label: "Barré", mark: "~~", icon: "S", style: { textDecoration: "line-through" } },
+] as const;
+
+function ComposerModal({
+  onClose,
+  onPublish,
+}: {
+  onClose: () => void;
+  onPublish: (title: string, body: string, pinned: boolean) => Promise<void>;
+}) {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [pinned, setPinned] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function applyMark(mark: string) {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = body.slice(start, end) || "texte";
+    const next = body.slice(0, start) + mark + selected + mark + body.slice(end);
+    setBody(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.selectionStart = start + mark.length;
+      ta.selectionEnd = start + mark.length + selected.length;
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !body.trim()) return;
+    setPublishing(true);
+    await onPublish(title, body, pinned);
+    setPublishing(false);
+  }
+
+  return (
+    <div className="ann-modal-backdrop" onClick={onClose}>
+      <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="ann-modal-header">
+          <h2>Nouvelle annonce</h2>
+          <button type="button" className="ann-modal-close" onClick={onClose} aria-label="Fermer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form className="ann-modal-body" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            className="ann-title-input"
+            placeholder="Titre de l'annonce"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+
+          <div className="ann-toolbar">
+            {TOOLBAR_ACTIONS.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                title={a.label}
+                style={a.style}
+                onClick={() => applyMark(a.mark)}
+              >
+                {a.icon}
+              </button>
+            ))}
+          </div>
+          <textarea
+            ref={textareaRef}
+            className="ann-body-input"
+            placeholder="Écrivez votre annonce... (sélectionnez du texte puis cliquez B/I/U/S pour le mettre en forme)"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            required
+          />
+
+          <label className="ann-checkbox">
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+            Épingler cette annonce
+          </label>
+
+          <div className="ann-modal-footer">
+            <button type="button" className="btn-muted" onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" disabled={publishing}>
+              {publishing ? "Publication..." : "Publier"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AnnouncementCenter({
   announcements,
   initialUnreadIds,
@@ -40,10 +147,7 @@ export default function AnnouncementCenter({
 }) {
   const [unread, setUnread] = useState(new Set(initialUnreadIds));
   const [expanded, setExpanded] = useState(new Set<string>());
-  const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [pinned, setPinned] = useState(false);
+  const [showComposer, setShowComposer] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const sorted = [...announcements].sort((a, b) => Number(b.pinned) - Number(a.pinned));
@@ -79,14 +183,9 @@ export default function AnnouncementCenter({
     startTransition(() => deleteAnnouncement(id));
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim() || !body.trim()) return;
+  async function handlePublish(title: string, body: string, pinned: boolean) {
     await createAnnouncement(title, body, pinned);
-    setTitle("");
-    setBody("");
-    setPinned(false);
-    setShowForm(false);
+    setShowComposer(false);
   }
 
   return (
@@ -100,8 +199,11 @@ export default function AnnouncementCenter({
           </div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
+          {/* Réservé aux Gérants et Co-Gérants : contrôlé ici pour l'UI, et
+              imposé côté base par la policy RLS "announcements_write_admins"
+              (donc infalsifiable même via un appel API bricolé). */}
           {isAdmin && (
-            <button className="pill-btn" onClick={() => setShowForm((s) => !s)} type="button">
+            <button className="pill-btn" onClick={() => setShowComposer(true)} type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 5v14M5 12h14" />
               </svg>
@@ -119,19 +221,7 @@ export default function AnnouncementCenter({
         </div>
       </div>
 
-      {showForm && (
-        <form className="ann-new-form" onSubmit={handleCreate}>
-          <label>Titre</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Mission interne" required />
-          <label>Contenu</label>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Détails de l'annonce..." required />
-          <label className="ann-checkbox">
-            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
-            Épingler cette annonce
-          </label>
-          <button type="submit">Publier</button>
-        </form>
-      )}
+      {showComposer && <ComposerModal onClose={() => setShowComposer(false)} onPublish={handlePublish} />}
 
       <div className="ann-list">
         {sorted.length === 0 && <div className="ann-empty">Aucune annonce pour l'instant.</div>}
@@ -157,7 +247,7 @@ export default function AnnouncementCenter({
               </div>
               <h4 className="ann-name">{a.title}</h4>
               <div className={`ann-collapse ${isExpanded ? "expanded" : ""}`}>
-                <div className="ann-body">{a.body}</div>
+                <div className="ann-body" dangerouslySetInnerHTML={{ __html: renderAnnouncementBody(a.body) }} />
                 <div className="ann-fade" />
               </div>
               <div className="ann-footer">

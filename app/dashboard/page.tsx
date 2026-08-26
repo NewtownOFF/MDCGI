@@ -2,7 +2,8 @@ import AppShell from "@/components/AppShell";
 import AnnouncementCenter from "@/components/AnnouncementCenter";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { ROLE_LABELS, isAdmin, type UserRole } from "@/lib/roles";
+import { isAdmin, type UserRole } from "@/lib/roles";
+import { getSessionProfile } from "@/lib/session";
 
 const DAYS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const MONTHS = [
@@ -19,17 +20,9 @@ function greeting() {
 }
 
 export default async function DashboardPage() {
+  const { userId, profile } = await getSessionProfile();
+  if (!userId) redirect("/login");
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("username, role")
-    .eq("id", user.id)
-    .single();
 
   const role = (profile?.role ?? "inconnu") as UserRole;
   const admin = isAdmin(role);
@@ -44,8 +37,8 @@ export default async function DashboardPage() {
     { data: readsRaw },
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("flex_posts").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "approved"),
-    supabase.from("flex_posts").select("*", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "pending"),
+    supabase.from("flex_posts").select("*", { count: "exact", head: true }).eq("user_id", userId).eq("status", "approved"),
+    supabase.from("flex_posts").select("*", { count: "exact", head: true }).eq("user_id", userId).eq("status", "pending"),
     supabase.from("links").select("*", { count: "exact", head: true }),
     admin
       ? supabase.from("flex_posts").select("*", { count: "exact", head: true }).eq("status", "pending")
@@ -54,7 +47,7 @@ export default async function DashboardPage() {
       .from("announcements")
       .select("id, title, body, pinned, created_at, profiles(username)")
       .order("created_at", { ascending: false }),
-    supabase.from("announcement_reads").select("announcement_id").eq("user_id", user.id),
+    supabase.from("announcement_reads").select("announcement_id").eq("user_id", userId),
   ]);
 
   const announcements = (announcementsRaw ?? []).map((a: any) => ({

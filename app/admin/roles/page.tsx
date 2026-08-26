@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { setUserRole } from "@/lib/actions";
+import { getSessionProfile } from "@/lib/session";
 import {
   ROLE_LABELS,
   assignableRoles,
@@ -8,15 +9,7 @@ import {
 
 export default async function RolesAdminPage() {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user!.id)
-    .single();
+  const { profile: me } = await getSessionProfile();
   const callerRole = (me?.role ?? "inconnu") as UserRole;
 
   const { data: profiles } = await supabase
