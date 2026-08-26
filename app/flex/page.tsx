@@ -1,4 +1,4 @@
-import Navbar from "@/components/Navbar";
+import AppShell from "@/components/AppShell";
 import FlexCard from "@/components/FlexCard";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -17,8 +17,7 @@ export default async function FlexPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <>
-      <Navbar />
+    <AppShell>
       <div className="container">
         <h1>Flex</h1>
         <p className="muted">Publications validées par les Gérants Médecin.</p>
@@ -44,6 +43,6 @@ export default async function FlexPage() {
           )}
         </div>
       </div>
-    </>
+    </AppShell>
   );
 }

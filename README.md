@@ -25,6 +25,9 @@ table `profiles` via l'éditeur SQL de Supabase.
 1. Va sur https://supabase.com → New Project.
 2. Une fois créé, va dans **SQL Editor** → colle le contenu de
    `supabase/schema.sql` → Run.
+3. Puis colle et exécute `supabase/schema-announcements.sql` (Centre d'annonces —
+   table `announcements` + `announcement_reads`, avec RLS : lecture pour tous
+   les connectés, écriture réservée aux Gérant/Co-Gérant).
 3. Va dans **Project Settings → API** : note `Project URL` et `anon public key`
    (pour `.env`).
 4. Va dans **Project Settings → API → service_role key** : note-la aussi

@@ -1,4 +1,4 @@
-import Navbar from "@/components/Navbar";
+import AppShell from "@/components/AppShell";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -15,8 +15,7 @@ export default async function LinksPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <>
-      <Navbar />
+    <AppShell>
       <div className="container">
         <h1>Liens utiles</h1>
         <div className="card">
@@ -30,6 +29,6 @@ export default async function LinksPage() {
           {(!links || links.length === 0) && <p className="muted">Aucun lien pour l'instant.</p>}
         </div>
       </div>
-    </>
+    </AppShell>
   );
 }

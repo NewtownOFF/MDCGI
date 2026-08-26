@@ -65,3 +65,63 @@ export async function setUserRole(userId: string, newRole: UserRole) {
   if (error) throw new Error(error.message);
   revalidatePath("/admin/roles");
 }
+
+export async function createAnnouncement(title: string, body: string, pinned: boolean) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non connecté");
+
+  const { error } = await supabase.from("announcements").insert({
+    title: title.trim(),
+    body: body.trim(),
+    pinned,
+    created_by: user.id,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+}
+
+export async function toggleAnnouncementPin(id: string, pinned: boolean) {
+  const supabase = createClient();
+  const { error } = await supabase.from("announcements").update({ pinned }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+}
+
+export async function deleteAnnouncement(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("announcements").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard");
+}
+
+export async function markAnnouncementRead(announcementId: string) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from("announcement_reads")
+    .upsert({ announcement_id: announcementId, user_id: user.id }, { onConflict: "announcement_id,user_id" });
+  revalidatePath("/dashboard");
+}
+
+export async function markAllAnnouncementsRead(announcementIds: string[]) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || announcementIds.length === 0) return;
+
+  await supabase
+    .from("announcement_reads")
+    .upsert(
+      announcementIds.map((id) => ({ announcement_id: id, user_id: user.id })),
+      { onConflict: "announcement_id,user_id" }
+    );
+  revalidatePath("/dashboard");
+}
